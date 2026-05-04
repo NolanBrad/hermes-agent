@@ -416,13 +416,13 @@ def run_doctor(args):
     except Exception as e:
         # Never let a bug in the advisory check block the rest of doctor.
         check_warn(f"Security advisory check failed: {e}")
-    
+
     # =========================================================================
     # Check: Python version
     # =========================================================================
     print()
     print(color("◆ Python Environment", Colors.CYAN, Colors.BOLD))
-    
+
     py_version = sys.version_info
     if py_version >= (3, 11):
         check_ok(f"Python {py_version.major}.{py_version.minor}.{py_version.micro}")
@@ -434,20 +434,20 @@ def run_doctor(args):
     else:
         check_fail(f"Python {py_version.major}.{py_version.minor}.{py_version.micro}", "(3.10+ required)")
         issues.append("Upgrade Python to 3.10+")
-    
+
     # Check if in virtual environment
     in_venv = sys.prefix != sys.base_prefix
     if in_venv:
         check_ok("Virtual environment active")
     else:
         check_warn("Not in virtual environment", "(recommended)")
-    
+
     # =========================================================================
     # Check: Required packages
     # =========================================================================
     print()
     print(color("◆ Required Packages", Colors.CYAN, Colors.BOLD))
-    
+
     required_packages = [
         ("openai", "OpenAI SDK"),
         ("rich", "Rich (terminal UI)"),
@@ -455,13 +455,13 @@ def run_doctor(args):
         ("yaml", "PyYAML"),
         ("httpx", "HTTPX"),
     ]
-    
+
     optional_packages = [
         ("croniter", "Croniter (cron expressions)"),
         ("telegram", "python-telegram-bot"),
         ("discord", "discord.py"),
     ]
-    
+
     for module, name in required_packages:
         try:
             __import__(module)
@@ -469,25 +469,25 @@ def run_doctor(args):
         except ImportError:
             check_fail(name, "(missing)")
             issues.append(f"Install {name}: {_python_install_cmd()} {module}")
-    
+
     for module, name in optional_packages:
         try:
             __import__(module)
             check_ok(name, "(optional)")
         except ImportError:
             check_warn(name, "(optional, not installed)")
-    
+
     # =========================================================================
     # Check: Configuration files
     # =========================================================================
     print()
     print(color("◆ Configuration Files", Colors.CYAN, Colors.BOLD))
-    
+
     # Check ~/.hermes/.env (primary location for user config)
     env_path = HERMES_HOME / '.env'
     if env_path.exists():
         check_ok(f"{_DHH}/.env file exists")
-        
+
         # Check for common issues. Pin encoding to UTF-8 because .env files are
         # written as UTF-8 everywhere in the codebase, while Path.read_text()
         # defaults to the system locale — which crashes on non-UTF-8 Windows
@@ -514,7 +514,7 @@ def run_doctor(args):
             else:
                 check_info("Run 'hermes setup' to create one")
                 issues.append("Run 'hermes setup' to create .env")
-    
+
     # Check ~/.hermes/config.yaml (primary) or project cli-config.yaml (fallback)
     config_path = HERMES_HOME / 'config.yaml'
     if config_path.exists():
@@ -834,7 +834,7 @@ def run_doctor(args):
     # =========================================================================
     print()
     print(color("◆ Directory Structure", Colors.CYAN, Colors.BOLD))
-    
+
     hermes_home = HERMES_HOME
     if hermes_home.exists():
         check_ok(f"{_DHH} directory exists")
@@ -844,7 +844,7 @@ def run_doctor(args):
         fixed_count += 1
     else:
         check_warn(f"{_DHH} not found", "(will be created on first use)")
-    
+
     # Check expected subdirectories
     expected_subdirs = ["cron", "sessions", "logs", "skills", "memories"]
     for subdir_name in expected_subdirs:
@@ -857,7 +857,7 @@ def run_doctor(args):
             fixed_count += 1
         else:
             check_warn(f"{_DHH}/{subdir_name}/ not found", "(will be created on first use)")
-    
+
     # Check for SOUL.md persona file
     soul_path = hermes_home / "SOUL.md"
     if soul_path.exists():
@@ -880,7 +880,7 @@ def run_doctor(args):
             )
             check_ok(f"Created {_DHH}/SOUL.md with basic template")
             fixed_count += 1
-    
+
     # Check memory directory
     memories_dir = hermes_home / "memories"
     if memories_dir.exists():
@@ -903,7 +903,7 @@ def run_doctor(args):
             memories_dir.mkdir(parents=True, exist_ok=True)
             check_ok(f"Created {_DHH}/memories/")
             fixed_count += 1
-    
+
     # Check SQLite session store
     state_db_path = hermes_home / "state.db"
     if state_db_path.exists():
@@ -1031,20 +1031,20 @@ def run_doctor(args):
     # =========================================================================
     print()
     print(color("◆ External Tools", Colors.CYAN, Colors.BOLD))
-    
+
     # Git
     if _safe_which("git"):
         check_ok("git")
     else:
         check_warn("git not found", "(optional)")
-    
+
     # ripgrep (optional, for faster file search)
     if _safe_which("rg"):
         check_ok("ripgrep (rg)", "(faster file search)")
     else:
         check_warn("ripgrep (rg) not found", "(file search uses grep fallback)")
         check_info(f"Install for faster search: {_system_package_install_cmd('ripgrep')}")
-    
+
     # Docker (optional)
     terminal_env = os.getenv("TERMINAL_ENV", "local")
     if terminal_env == "docker":
@@ -1068,7 +1068,7 @@ def run_doctor(args):
         check_info("Docker backend is not available inside Termux (expected on Android)")
     else:
         check_warn("docker not found", "(optional)")
-    
+
     # SSH (if using ssh backend)
     if terminal_env == "ssh":
         ssh_host = os.getenv("TERMINAL_SSH_HOST")
@@ -1091,7 +1091,7 @@ def run_doctor(args):
         else:
             check_fail("TERMINAL_SSH_HOST not set", "(required for TERMINAL_ENV=ssh)")
             issues.append("Set TERMINAL_SSH_HOST in .env")
-    
+
     # Daytona (if using daytona backend)
     if terminal_env == "daytona":
         daytona_key = os.getenv("DAYTONA_API_KEY")
@@ -1156,80 +1156,29 @@ def run_doctor(args):
         check_ok("Node.js")
         # Check if agent-browser is installed
         agent_browser_path = PROJECT_ROOT / "node_modules" / "agent-browser"
-        agent_browser_ok = False
+        agent_browser_which = _safe_which("agent-browser")
+
         if agent_browser_path.exists():
             check_ok("agent-browser (Node.js)", "(browser automation)")
-            agent_browser_ok = True
-        elif shutil.which("agent-browser"):
-            check_ok("agent-browser", "(browser automation)")
-            agent_browser_ok = True
-        elif _is_termux():
-            check_info("agent-browser is not installed (expected in the tested Termux path)")
-            check_info("Install it manually later with: npm install -g agent-browser && agent-browser install")
+        else:
+            if _is_termux():
+                check_info("agent-browser is not installed (expected in the tested Termux path)")
+                check_info("Install it manually later with: npm install -g agent-browser && agent-browser install")
+                check_info("Termux browser setup:")
+                for step in _termux_browser_setup_steps(node_installed=True):
+                    check_info(step)
+            else:
+                check_warn("agent-browser not installed", "(run: npm install)")
+    else:
+        if _is_termux():
+            check_info("Node.js not found (browser tools are optional in the tested Termux path)")
+            check_info("Install Node.js on Termux with: pkg install nodejs")
             check_info("Termux browser setup:")
-            for step in _termux_browser_setup_steps(node_installed=True):
+            for step in _termux_browser_setup_steps(node_installed=False):
                 check_info(step)
         else:
-            check_warn("agent-browser not installed", "(run: npm install)")
+            check_warn("Node.js not found", "(optional, needed for browser tools)")
 
-        # Chromium presence — the browser tools silently fail to register when
-        # agent-browser is found but no Playwright-managed Chromium is on disk
-        # (tools/browser_tool.py::check_browser_requirements filters them out
-        # before the agent ever sees them).  Reuse the exact predicate it uses
-        # so the two checks cannot diverge.  Skip on Termux (not a tested
-        # path).
-        if agent_browser_ok and not _is_termux():
-            try:
-                # Lazy import: browser_tool is a ~150KB module we don't want
-                # to eagerly load in every `hermes doctor` invocation.
-                from tools.browser_tool import (
-                    _chromium_installed,
-                    _is_camofox_mode,
-                    _get_cloud_provider,
-                    _get_cdp_override,
-                    _using_lightpanda_engine,
-                )
-            except Exception:
-                # If browser_tool can't even import, that's a separate bug
-                # surfaced elsewhere; don't crash doctor.
-                pass
-            else:
-                # Only warn about Chromium if the installed engine actually
-                # requires it: Camofox, CDP override, a cloud provider, or
-                # Lightpanda all bypass the local Chromium requirement.
-                skip_chromium_check = (
-                    _is_camofox_mode()
-                    or bool(_get_cdp_override())
-                    or _get_cloud_provider() is not None
-                    or _using_lightpanda_engine()
-                )
-                if not skip_chromium_check:
-                    if _chromium_installed():
-                        check_ok("Playwright Chromium", "(browser engine)")
-                    else:
-                        check_warn(
-                            "Playwright Chromium not installed",
-                            "(browser_* tools will be hidden from the agent)",
-                        )
-                        if sys.platform == "win32":
-                            check_info(
-                                f"Install with: cd {PROJECT_ROOT} && "
-                                "npx playwright install chromium"
-                            )
-                        else:
-                            check_info(
-                                f"Install with: cd {PROJECT_ROOT} && "
-                                "npx playwright install --with-deps chromium"
-                            )
-    elif _is_termux():
-        check_info("Node.js not found (browser tools are optional in the tested Termux path)")
-        check_info("Install Node.js on Termux with: pkg install nodejs")
-        check_info("Termux browser setup:")
-        for step in _termux_browser_setup_steps(node_installed=False):
-            check_info(step)
-    else:
-        check_warn("Node.js not found", "(optional, needed for browser tools)")
-    
     # npm audit for all Node.js packages
     _npm_bin = _safe_which("npm")
     if _npm_bin:
@@ -1629,19 +1578,19 @@ def run_doctor(args):
     # =========================================================================
     print()
     print(color("◆ Tool Availability", Colors.CYAN, Colors.BOLD))
-    
+
     try:
         # Add project root to path for imports
         sys.path.insert(0, str(PROJECT_ROOT))
         from model_tools import check_tool_availability, TOOLSET_REQUIREMENTS
-        
+
         available, unavailable = check_tool_availability()
         available, unavailable = _apply_doctor_tool_availability_overrides(available, unavailable)
-        
+
         for tid in available:
             info = TOOLSET_REQUIREMENTS.get(tid, {})
             check_ok(info.get("name", tid), _doctor_tool_availability_detail(tid))
-        
+
         for item in unavailable:
             env_vars = item.get("missing_vars") or item.get("env_vars") or []
             if env_vars:
@@ -1656,7 +1605,7 @@ def run_doctor(args):
             issues.append("Run 'hermes setup' to configure missing API keys for full tool access")
     except Exception as e:
         check_warn("Could not check tool availability", f"({e})")
-    
+
     # =========================================================================
     # Check: Skills Hub
     # =========================================================================
@@ -1858,5 +1807,5 @@ def run_doctor(args):
     else:
         print(color("─" * 60, Colors.GREEN))
         print(color("  All checks passed! 🎉", Colors.GREEN, Colors.BOLD))
-    
+
     print()
