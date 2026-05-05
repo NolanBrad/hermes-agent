@@ -1435,7 +1435,7 @@ def _resolve_child_python(mode: str) -> str:
         exe_names = ("python", "python3")
         subdirs = ("bin",)
 
-    for var in ("VIRTUAL_ENV", "CONDA_PREFIX"):
+    for var in ("VIRTUAL_ENV_CODE_EXECUTE", "VIRTUAL_ENV", "CONDA_PREFIX"):
         root = os.environ.get(var, "").strip()
         if not root:
             continue
@@ -1445,6 +1445,7 @@ def _resolve_child_python(mode: str) -> str:
                 if not (os.path.isfile(candidate) and os.access(candidate, os.X_OK)):
                     continue
                 if _is_usable_python(candidate):
+                    logger.info("execute_code: found candidate var:%s root:%s, candidate:%s", var, root, candidate)
                     return candidate
                 # Found the interpreter but it failed the version check —
                 # log once and fall through to sys.executable.
