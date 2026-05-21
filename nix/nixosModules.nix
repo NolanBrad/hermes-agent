@@ -156,14 +156,14 @@
         su -s /bin/sh "$TARGET_USER" -c 'curl -LsSf https://astral.sh/uv/install.sh | sh' || true
       fi
 
-      # Python 3.12 venv — gives the agent a writable Python with pip.
+      # Python 3.13 venv — gives the agent a writable Python with pip.
       # --seed includes pip/setuptools so bare `pip install` works.
       _UV_BIN="$TARGET_HOME/.local/bin/uv"
       if [ ! -d "$TARGET_HOME/.venv" ] && [ -x "$_UV_BIN" ]; then
         su -s /bin/sh "$TARGET_USER" -c "
           export PATH=\"\$HOME/.local/bin:\$PATH\"
-          uv python install 3.12
-          uv venv --python 3.12 --seed \"\$HOME/.venv\"
+          uv python install 3.13
+          uv venv --python 3.13 --seed \"\$HOME/.venv\"
         " || true
       fi
 
@@ -500,11 +500,11 @@
           Python packages to add to PYTHONPATH for entry-point plugin discovery.
           These are pip-packaged plugins that register via the
           hermes_agent.plugins entry-point group. Each package must be built
-          with the same Python interpreter as hermes (python312).
+          with the same Python interpreter as hermes (python3).
         '';
         example = literalExpression ''
           [
-            (pkgs.python312Packages.buildPythonPackage {
+            (pkgs.python3Packages.buildPythonPackage {
               pname = "rtk-hermes";
               version = "1.0.0";
               src = pkgs.fetchFromGitHub {
