@@ -7,10 +7,13 @@
   pyproject-nix,
   pyproject-build-systems,
   stdenv,
+  # Filtered Python source (see lib.nix pythonSrc) — keeps JS/docs/skills
+  # edits from invalidating the venv derivation.
+  pythonSrc,
   dependency-groups ? [ "all" ],
 }:
 let
-  workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ./..; };
+  workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = pythonSrc; };
   hacks = callPackage pyproject-nix.build.hacks { };
 
   overlay = workspace.mkPyprojectOverlay {
@@ -27,7 +30,8 @@ let
     dependency-groups = { };
   };
 
-  mkPrebuiltOverride = final: from: dependencies:
+  mkPrebuiltOverride =
+    final: from: dependencies:
     hacks.nixpkgsPrebuilt {
       inherit from;
       prev = {
@@ -38,21 +42,30 @@ let
 
   # Legacy alibabacloud packages ship only sdists with setup.py/setup.cfg
   # and no pyproject.toml, so setuptools isn't declared as a build dep.
-  buildSystemOverrides = final: prev: builtins.mapAttrs
-    (name: _: prev.${name}.overrideAttrs (old: {
-      nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ final.setuptools ];
-    }))
-    (lib.genAttrs [
-      "alibabacloud-credentials-api"
-      "alibabacloud-endpoint-util"
-      "alibabacloud-gateway-dingtalk"
-      "alibabacloud-gateway-spi"
-      "alibabacloud-tea"
-    ] (_: null));
+  buildSystemOverrides =
+    final: prev:
+    builtins.mapAttrs
+      (
+        name: _:
+        prev.${name}.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ final.setuptools ];
+        })
+      )
+      (
+        lib.genAttrs [
+          "alibabacloud-credentials-api"
+          "alibabacloud-endpoint-util"
+          "alibabacloud-gateway-dingtalk"
+          "alibabacloud-gateway-spi"
+          "alibabacloud-tea"
+        ] (_: null)
+      );
 
-  pythonPackageOverrides = final: _prev:
-    if isAarch64Darwin then {
-      numpy = mkPrebuiltOverride final python3.pkgs.numpy { };
+  pythonPackageOverrides =
+    final: _prev:
+    if isAarch64Darwin then
+      {
+        numpy = mkPrebuiltOverride final python3.pkgs.numpy { };
 
       pyarrow = mkPrebuiltOverride final python3.pkgs.pyarrow { };
 
@@ -89,13 +102,45 @@ let
     (callPackage pyproject-nix.build.packages {
       python = python3;
     }).overrideScope
-      (lib.composeManyExtensions [
-        pyproject-build-systems.overlays.default
-        overlay
-        buildSystemOverrides
-        pythonPackageOverrides
-      ]);
+      (
+        lib.composeManyExtensions [
+          pyproject-build-systems.overlays.default
+          overlay
+          buildSystemOverrides
+          pythonPackageOverrides
+        ]
+      );
+
+  # The editable venv points at the live checkout, so it uses an
+  # UNFILTERED workspace rooted at a real path — mkEditablePyprojectOverlay
+  # computes relative paths via lib.path.splitRoot, which rejects the
+  # filtered pythonSrc (a cleanSourceWith set, not a path).  Filtering
+  # buys nothing here anyway: the editable install reads from
+  # $HERMES_PYTHON_SRC_ROOT at runtime.
+  workspaceRoot = ./..;
+  editableWorkspace = uv2nix.lib.workspace.loadWorkspace { inherit workspaceRoot; };
+  editableOverlay = editableWorkspace.mkEditablePyprojectOverlay {
+    root = "$HERMES_PYTHON_SRC_ROOT"; # resolved at shellHook time
+  };
+
+  editableSet = pythonSet.overrideScope (
+    lib.composeManyExtensions [
+      editableOverlay
+      (final: prev: {
+        hermes-agent = prev.hermes-agent.overrideAttrs (old: {
+          # point straight at the real source instead of the filtered nix store copy
+          src = workspaceRoot;
+          nativeBuildInputs = old.nativeBuildInputs ++ final.resolveBuildSystem { editables = [ ]; };
+        });
+      })
+    ]
+  );
 in
-pythonSet.mkVirtualEnv "hermes-agent-env" {
-  hermes-agent = dependency-groups;
+{
+  venv = pythonSet.mkVirtualEnv "hermes-agent-env" {
+    hermes-agent = dependency-groups;
+  };
+  editableVenv = editableSet.mkVirtualEnv "hermes-agent-editable-env" {
+    hermes-agent = dependency-groups;
+  };
 }
