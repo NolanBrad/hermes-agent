@@ -24,7 +24,7 @@
   writeShellScript,
   coreutils,
   callPackage,
-  nodejs_26,
+  nodejs_24,
   symlinkJoin,
   buildNpmPackage,
   runCommand,
@@ -171,8 +171,14 @@ let
           ".gitignore"
           "setup-hermes.sh"
         ];
+        # uv.lock must be included for the Python build
+        allowedFiles = [
+          "uv.lock"
+        ];
       in
       if relPath == "" then
+        true
+      else if builtins.elem relPath allowedFiles then
         true
       else if builtins.elem relPath excludedFiles then
         false
