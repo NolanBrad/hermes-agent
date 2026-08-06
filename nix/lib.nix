@@ -24,7 +24,7 @@
   writeShellScript,
   coreutils,
   callPackage,
-  nodejs_24,
+  nodejs_26,
   symlinkJoin,
   buildNpmPackage,
   runCommand,
