@@ -1,6 +1,5 @@
 # nix/python.nix — uv2nix virtual environment builder
 {
-  python3,
   lib,
   callPackage,
   uv2nix,
@@ -13,6 +12,12 @@
   dependency-groups ? [ "all" ],
 }:
 let
+  # The interpreter family comes from pm/lock.json (pythonLock.nix owns the
+  # selection); every override below must be built for THAT interpreter.
+  pythonLock = callPackage ./pythonLock.nix { };
+  python = pythonLock.interpreter;
+  pythonPackages = python.pkgs;
+
   workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = pythonSrc; };
   hacks = callPackage pyproject-nix.build.hacks { };
 
@@ -59,48 +64,67 @@ let
           "alibabacloud-gateway-spi"
           "alibabacloud-tea"
         ] (_: null)
-      );
+      )
+    // {
+      # The locked sdist has no build-system metadata; setup.py imports
+      # setuptools and uses CFFI to compile the bundled libolm.
+      python-olm = prev.python-olm.overrideAttrs (old: {
+        nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ final.resolveBuildSystem {
+          setuptools = [ ];
+          cffi = [ ];
+        };
+      });
+      # [kittentts] locks misaki as a git source. uv.lock records no build
+      # backend for it, so supply the hatchling its pyproject declares.
+      misaki = prev.misaki.overrideAttrs (old: {
+        nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ final.resolveBuildSystem {
+          hatchling = [ ];
+        };
+      });
+    };
 
   pythonPackageOverrides =
     final: _prev:
     if isAarch64Darwin then
       {
-        numpy = mkPrebuiltOverride final python3.pkgs.numpy { };
+        numpy = mkPrebuiltOverride final pythonPackages.numpy { };
 
-      pyarrow = mkPrebuiltOverride final python3.pkgs.pyarrow { };
+        pyarrow = mkPrebuiltOverride final pythonPackages.pyarrow { };
 
-      av = mkPrebuiltOverride final python3.pkgs.av { };
+        av = mkPrebuiltOverride final pythonPackages.av { };
 
-      humanfriendly = mkPrebuiltOverride final python3.pkgs.humanfriendly { };
+        humanfriendly = mkPrebuiltOverride final pythonPackages.humanfriendly { };
 
-      coloredlogs = mkPrebuiltOverride final python3.pkgs.coloredlogs {
-        humanfriendly = [ ];
-      };
+        coloredlogs = mkPrebuiltOverride final pythonPackages.coloredlogs {
+          humanfriendly = [ ];
+        };
 
-      onnxruntime = mkPrebuiltOverride final python3.pkgs.onnxruntime {
-        coloredlogs = [ ];
-        numpy = [ ];
-        packaging = [ ];
-      };
+        onnxruntime = mkPrebuiltOverride final pythonPackages.onnxruntime {
+          coloredlogs = [ ];
+          numpy = [ ];
+          packaging = [ ];
+        };
 
-      ctranslate2 = mkPrebuiltOverride final python3.pkgs.ctranslate2 {
-        numpy = [ ];
-        pyyaml = [ ];
-      };
+        ctranslate2 = mkPrebuiltOverride final pythonPackages.ctranslate2 {
+          numpy = [ ];
+          pyyaml = [ ];
+        };
 
-      faster-whisper = mkPrebuiltOverride final python3.pkgs.faster-whisper {
-        av = [ ];
-        ctranslate2 = [ ];
-        huggingface-hub = [ ];
-        onnxruntime = [ ];
-        tokenizers = [ ];
-        tqdm = [ ];
-      };
-    } else {};
+        faster-whisper = mkPrebuiltOverride final pythonPackages.faster-whisper {
+          av = [ ];
+          ctranslate2 = [ ];
+          huggingface-hub = [ ];
+          onnxruntime = [ ];
+          tokenizers = [ ];
+          tqdm = [ ];
+        };
+      }
+    else
+      { };
 
   pythonSet =
     (callPackage pyproject-nix.build.packages {
-      python = python3;
+      inherit python;
     }).overrideScope
       (
         lib.composeManyExtensions [
@@ -146,6 +170,8 @@ let
   );
 in
 {
+  inherit python;
+
   venv = pythonSet.mkVirtualEnv "hermes-agent-env" {
     hermes-agent = dependency-groups;
   };
