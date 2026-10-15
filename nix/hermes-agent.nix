@@ -80,7 +80,7 @@ let
   mkHermesVenv =
     extraDependencyGroups:
     callPackage ./python.nix {
-      inherit uv2nix pyproject-nix pyproject-build-systems python3;
+      inherit uv2nix pyproject-nix pyproject-build-systems;
       pythonSrc = hermesNpmLib.pythonSrc;
       dependency-groups = [ "all" ] ++ extraDependencyGroups;
     };
