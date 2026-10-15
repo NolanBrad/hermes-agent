@@ -36,10 +36,6 @@
       lastModified = inputs.self.lastModified or null;
       minimal = pkgs.callPackage ./hermes-agent.nix {
         inherit (inputs) uv2nix pyproject-nix pyproject-build-systems;
-        # pyproject.toml pins requires-python to <3.14 — pin explicitly
-        # instead of floating on pkgs.python3, which nixpkgs bumps
-        # independently of this constraint.
-        python3 = pkgs.python313;
         npm-lockfile-fix = inputs'.npm-lockfile-fix.packages.default;
         inherit
           rev
